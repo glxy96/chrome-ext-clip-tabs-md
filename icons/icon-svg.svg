@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- 背景 -->
+  <rect width="512" height="512" rx="80" fill="#4285F4"/>
+  
+  <!-- リンクアイコン -->
+  <path d="M256 128L176 208M256 128L336 208M256 128V384" stroke="white" stroke-width="40" stroke-linecap="round"/>
+  
+  <!-- リストマーカー -->
+  <circle cx="176" cy="304" r="20" fill="white"/>
+  <circle cx="176" cy="384" r="20" fill="white"/>
+</svg>

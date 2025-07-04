@@ -1,0 +1,22 @@
+{
+  "name": "Copy URLs to Markdown",
+  "version": "1.0",
+  "manifest_version": 3,
+  "description": "選択中のタブのURLをMarkdown形式でコピーする",
+  "permissions": ["tabs", "clipboardWrite", "scripting", "activeTab"],
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
