@@ -1,6 +1,6 @@
-// content.js (新規作成が必要)
+// コピー成功時のメッセージ表示
 chrome.runtime.onMessage.addListener((message) => {
-if (message.type === "COPY_SUCCESS") {
+  if (message.type === "COPY_SUCCESS") {
     // 成功メッセージを表示
     const msg = document.createElement('div');
     msg.textContent = 'URLsをコピーしました！';
@@ -14,10 +14,10 @@ if (message.type === "COPY_SUCCESS") {
     msg.style.borderRadius = '5px';
     msg.style.zIndex = '9999';
     document.body.appendChild(msg);
-    
+
     // 0.5秒後にメッセージを消す
-    setTimeout(function() {
-    document.body.removeChild(msg);
+    setTimeout(() => {
+      document.body.removeChild(msg);
     }, 500);
-}
+  }
 });
