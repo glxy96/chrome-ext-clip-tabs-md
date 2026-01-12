@@ -1,53 +1,80 @@
+// Offscreen documentの管理
+let offscreenDocumentCreated = false;
+
+async function setupOffscreenDocument() {
+  if (offscreenDocumentCreated) return;
+
+  try {
+    await chrome.offscreen.createDocument({
+      url: 'offscreen.html',
+      reasons: ['CLIPBOARD'],
+      justification: 'クリップボードへのテキスト書き込み'
+    });
+    offscreenDocumentCreated = true;
+  } catch (error) {
+    // すでに作成済みの場合はエラーになるが問題ない
+    if (!error.message.includes('Only a single offscreen document')) {
+      console.error('Offscreen document作成エラー:', error);
+    }
+  }
+}
+
 // 拡張機能アイコンをクリックしたときの処理
-chrome.action.onClicked.addListener((tab) => {
+chrome.action.onClicked.addListener(async (tab) => {
   // 現在のウィンドウで選択されているタブを取得
-  chrome.tabs.query({ highlighted: true, currentWindow: true }, (tabs) => {
+  chrome.tabs.query({ highlighted: true, currentWindow: true }, async (tabs) => {
     if (tabs.length === 0) return;
-    
+
     // Markdown形式のリストを生成
     let markdownText = '';
     tabs.forEach(tab => {
       markdownText += `- [${escapeMarkdown(tab.title)}](${tab.url})\n`;
     });
-    
+
     // クリップボードにコピー
-    copyToClipboard(markdownText);
+    await copyToClipboard(markdownText);
   });
 });
 
 // Markdown向けに特殊文字をエスケープする関数
 function escapeMarkdown(text) {
   if (!text) return '';
-  // []()などのMarkdown記法で特殊な意味を持つ文字をエスケープ
-  return text.replace(/([[\]()>*#+\-_.!])/g, '\\$1');
+  // タイトル内で問題となる [ と ] のみエスケープ
+  return text.replace(/([[\]])/g, '\\$1');
 }
 
 // クリップボードにコピーする関数
-function copyToClipboard(text) {
-  // Service Workerでは直接クリップボードにアクセスできないため、
-  // 一時的なコンテンツスクリプトを挿入して処理を行う
-  chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
-    if (!tabs[0]) return;
-    
-    chrome.scripting.executeScript({
-      target: { tabId: tabs[0].id },
-      function: copyTextToClipboard,
-      args: [text]
-    });
-  });
-  
-  // コピー完了を通知
-  chrome.action.setBadgeText({ text: "✓" });
-  setTimeout(() => {
-    chrome.action.setBadgeText({ text: "" });
-  }, 1500);
-}
-
-// ページ内で実行される関数（クリップボードへのコピー実行）
-function copyTextToClipboard(text) {
+async function copyToClipboard(text) {
   try {
-    navigator.clipboard.writeText(text);
-  } catch (err) {
-    console.error('クリップボードへのコピーに失敗しました:', err);
+    // Offscreen documentを準備
+    await setupOffscreenDocument();
+
+    // Offscreen documentにメッセージを送信してクリップボードにコピー
+    const response = await chrome.runtime.sendMessage({
+      type: 'COPY_TO_CLIPBOARD',
+      text: text
+    });
+
+    if (response && response.success) {
+      // コピー完了を通知
+      chrome.action.setBadgeText({ text: "✓" });
+      setTimeout(() => {
+        chrome.action.setBadgeText({ text: "" });
+      }, 1500);
+
+      // アクティブなタブに成功メッセージを送信
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+          chrome.tabs.sendMessage(tabs[0].id, { type: "COPY_SUCCESS" })
+            .catch(() => {
+              // content scriptが読み込まれていない場合は無視
+            });
+        }
+      });
+    } else {
+      console.error('クリップボードへのコピーに失敗しました');
+    }
+  } catch (error) {
+    console.error('クリップボード操作エラー:', error);
   }
 }
