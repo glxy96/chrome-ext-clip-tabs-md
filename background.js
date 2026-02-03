@@ -25,14 +25,24 @@ chrome.action.onClicked.addListener(async (tab) => {
   chrome.tabs.query({ highlighted: true, currentWindow: true }, async (tabs) => {
     if (tabs.length === 0) return;
 
+    // URLのみのリストを生成
+    let urlOnlyText = '';
+    tabs.forEach(tab => {
+      urlOnlyText += `${tab.url}\n`;
+    });
+
     // Markdown形式のリストを生成
     let markdownText = '';
     tabs.forEach(tab => {
       markdownText += `- [${escapeMarkdown(tab.title)}](${tab.url})\n`;
     });
 
-    // クリップボードにコピー
-    await copyToClipboard(markdownText);
+    // 両形式をクリップボードにコピー（URLのみ → Markdown の順）
+    // クリップボード履歴ツールで両方アクセス可能に
+    await copyToClipboard(urlOnlyText, { notify: false });
+    // 履歴ツールが認識できるよう少し待つ
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await copyToClipboard(markdownText, { notify: true });
   });
 });
 
@@ -44,7 +54,7 @@ function escapeMarkdown(text) {
 }
 
 // クリップボードにコピーする関数
-async function copyToClipboard(text) {
+async function copyToClipboard(text, options = { notify: true }) {
   try {
     // Offscreen documentを準備
     await setupOffscreenDocument();
@@ -56,21 +66,24 @@ async function copyToClipboard(text) {
     });
 
     if (response && response.success) {
-      // コピー完了を通知
-      chrome.action.setBadgeText({ text: "✓" });
-      setTimeout(() => {
-        chrome.action.setBadgeText({ text: "" });
-      }, 1500);
+      // 通知が有効な場合のみ表示
+      if (options.notify) {
+        // コピー完了を通知
+        chrome.action.setBadgeText({ text: "✓" });
+        setTimeout(() => {
+          chrome.action.setBadgeText({ text: "" });
+        }, 1500);
 
-      // アクティブなタブに成功メッセージを送信
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]) {
-          chrome.tabs.sendMessage(tabs[0].id, { type: "COPY_SUCCESS" })
-            .catch(() => {
-              // content scriptが読み込まれていない場合は無視
-            });
-        }
-      });
+        // アクティブなタブに成功メッセージを送信
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id, { type: "COPY_SUCCESS" })
+              .catch(() => {
+                // content scriptが読み込まれていない場合は無視
+              });
+          }
+        });
+      }
     } else {
       console.error('クリップボードへのコピーに失敗しました');
     }

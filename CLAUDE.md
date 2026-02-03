@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Chrome extension (Manifest V3) that copies URLs of selected browser tabs to the clipboard in Markdown format. When the extension icon is clicked, it generates a Markdown list of all highlighted tabs in the current window.
+Chrome extension (Manifest V3) that copies URLs of selected browser tabs to the clipboard in Markdown format. Clicking the extension icon generates a Markdown list of all highlighted tabs in the current window.
 
 **Extension Name:** Copy URLs to Markdown
 **Manifest Version:** 3
@@ -15,59 +15,58 @@ This is a Chrome extension (Manifest V3) that copies URLs of selected browser ta
 
 1. **background.js** - Service worker (background script)
    - Main entry point: `chrome.action.onClicked` listener
-   - Queries highlighted tabs using `chrome.tabs.query()`
+   - Queries highlighted tabs using `chrome.tabs.query({ highlighted: true, currentWindow: true })`
    - Generates Markdown formatted list: `- [title](url)`
-   - Handles clipboard operations via injected scripts
+   - Coordinates clipboard operations via Offscreen Document API
    - Shows temporary badge notification ("✓") for 1.5 seconds after copying
 
-2. **content.js** - Content script (not currently used in manifest)
-   - Contains UI notification code for displaying success messages
-   - Note: This file exists but is not registered in manifest.json
+2. **offscreen.js + offscreen.html** - Offscreen Document for clipboard access
+   - Manifest V3 service workers cannot access DOM or clipboard directly
+   - Offscreen document receives `COPY_TO_CLIPBOARD` messages from background.js
+   - Uses `document.execCommand('copy')` via hidden textarea element
 
-3. **manifest.json** - Extension configuration
-   - Permissions: `tabs`, `clipboardWrite`, `scripting`, `activeTab`
-   - Service worker: background.js
-   - No browser action popup - uses click handler instead
+3. **content.js** - Content script (injected on all URLs)
+   - Listens for `COPY_SUCCESS` messages from background.js
+   - Displays toast notification at top of page for 0.5 seconds
+
+4. **manifest.json** - Extension configuration
+   - Permissions: `tabs`, `clipboardWrite`, `scripting`, `activeTab`, `offscreen`
+   - No popup - uses click handler instead
+
+### Message Flow
+
+```
+User clicks icon → background.js → offscreen.js (clipboard) → background.js → content.js (toast)
+```
 
 ### Key Implementation Details
 
-**Clipboard Access Pattern:**
-Since Manifest V3 service workers cannot directly access `navigator.clipboard`, the extension uses `chrome.scripting.executeScript()` to inject the `copyTextToClipboard` function into the active tab, which then performs the actual clipboard write.
-
 **Markdown Escaping:**
-The `escapeMarkdown()` function in background.js:18 escapes special Markdown characters (`[]()>*#+\-_.!`) to prevent formatting issues in titles.
+`escapeMarkdown()` in background.js only escapes `[` and `]` characters to prevent link syntax issues in titles.
 
-**Tab Selection:**
-Uses `chrome.tabs.query({ highlighted: true, currentWindow: true })` to get all selected/highlighted tabs, not just the active tab.
-
-## Development Commands
+## Development
 
 ### Loading the Extension
 
-1. Open Chrome and navigate to `chrome://extensions/`
-2. Enable "Developer mode" (toggle in top-right)
-3. Click "Load unpacked"
-4. Select the `/Users/ginga/repos/chrome-ext-clip-tabs-md` directory
+1. Open `chrome://extensions/`
+2. Enable "Developer mode"
+3. Click "Load unpacked" and select this directory
 
 ### Testing
 
-Manually test by:
-1. Selecting multiple tabs (Cmd+Click on macOS, Ctrl+Click on Windows)
-2. Clicking the extension icon
-3. Pasting clipboard content to verify Markdown format
+1. Select multiple tabs (Cmd+Click on macOS, Ctrl+Click on Windows)
+2. Click the extension icon
+3. Paste to verify Markdown format
 
-### Modifying Icons
+### Icons
 
-Icons are located in the `icons/` directory:
-- Source SVG: `icon-svg.svg`
-- Required sizes: 16x16, 48x48, 128x128 PNG files
+Located in `icons/` directory:
+- Source: `icon-svg.svg`
+- Required: 16x16, 48x48, 128x128 PNG
 
-After modifying icons, reload the extension in `chrome://extensions/`.
+After modifying icons, reload the extension.
 
-## Code Notes
+## Notes
 
-**Language:** The codebase contains Japanese comments and descriptions.
-
-**Potential Issues:**
-- content.js is not registered in manifest.json, so its notification UI code is unused
-- The clipboard injection targets only the active tab, which may fail if the active tab has restricted permissions (e.g., chrome:// pages)
+- Codebase uses Japanese comments
+- Works on chrome:// pages and incognito mode (per README)
